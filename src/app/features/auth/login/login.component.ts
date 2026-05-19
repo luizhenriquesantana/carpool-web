@@ -8,6 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../../core/services/auth.service';
+import { SocialAuthService } from '../../../core/services/social-auth.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -32,6 +34,32 @@ import { AuthService } from '../../../core/services/auth.service';
           @if (error()) {
             <div class="error-message">{{ error() }}</div>
           }
+
+          <div class="social-buttons">
+            <button mat-stroked-button class="social-btn google-btn" (click)="signInWithGoogle()"
+                    [disabled]="socialLoading()">
+              @if (socialLoading() && currentProvider() === 'google') {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                <mat-icon class="btn-icon">google</mat-icon>
+                <span>Sign in with Google</span>
+              }
+            </button>
+
+            <button mat-stroked-button class="social-btn github-btn" (click)="signInWithGitHub()"
+                    [disabled]="socialLoading()">
+              @if (socialLoading() && currentProvider() === 'github') {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                <mat-icon class="btn-icon">github</mat-icon>
+                <span>Sign in with GitHub</span>
+              }
+            </button>
+          </div>
+
+          <div class="divider">
+            <span>or</span>
+          </div>
 
           <form (ngSubmit)="onSubmit()">
             <mat-form-field appearance="outline" class="full-width">
@@ -103,17 +131,70 @@ import { AuthService } from '../../../core/services/auth.service';
     mat-card-header {
       margin-bottom: 16px;
     }
+    .social-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .social-btn {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+    .google-btn {
+      color: #757575;
+      border-color: #ddd;
+    }
+    .github-btn {
+      color: #24292e;
+      border-color: #ddd;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 20px 0;
+      color: rgba(0, 0, 0, 0.54);
+      font-size: 14px;
+    }
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    }
+    .divider span {
+      padding: 0 12px;
+    }
   `]
 })
 export class LoginComponent {
   private readonly authService = inject(AuthService);
+  private readonly socialAuthService = inject(SocialAuthService);
   private readonly router = inject(Router);
 
   username = '';
   password = '';
   loading = signal(false);
+  socialLoading = signal(false);
+  currentProvider = signal<'google' | 'github' | null>(null);
   error = signal('');
   hidePassword = signal(true);
+
+  signInWithGoogle(): void {
+    this.socialAuthService.signInWithGoogle();
+  }
+
+  signInWithGitHub(): void {
+    this.socialAuthService.signInWithGitHub();
+  }
 
   onSubmit(): void {
     this.loading.set(true);

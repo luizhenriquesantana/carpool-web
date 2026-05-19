@@ -8,6 +8,13 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface SocialLoginRequest {
+  provider: 'google' | 'github';
+  token: string;
+  email: string;
+  name: string;
+}
+
 export interface AuthResponse {
   token: string;
 }

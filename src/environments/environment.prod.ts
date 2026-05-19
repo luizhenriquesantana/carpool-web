@@ -1,4 +1,6 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://your-api-domain.com'
+  apiUrl: 'https://carpool-route-planning.fly.dev',
+  googleClientId: 'YOUR_GOOGLE_CLIENT_ID',
+  githubClientId: 'YOUR_GITHUB_CLIENT_ID'
 };

@@ -1,4 +1,6 @@
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:8080'
+  apiUrl: 'http://localhost:8080',
+  googleClientId: 'YOUR_GOOGLE_CLIENT_ID',
+  githubClientId: 'YOUR_GITHUB_CLIENT_ID'
 };

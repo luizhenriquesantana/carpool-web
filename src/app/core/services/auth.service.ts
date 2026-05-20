@@ -43,10 +43,13 @@ export class AuthService {
     );
   }
 
-  logout(): void {
+  logout(message?: string): void {
     this.tokenSignal.set(null);
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem('auth_token');
+    }
+    if (message) {
+      alert(message);
     }
     this.router.navigate(['/login']);
   }

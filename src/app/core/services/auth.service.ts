@@ -44,14 +44,29 @@ export class AuthService {
   }
 
   logout(message?: string): void {
-    this.tokenSignal.set(null);
-    if (isPlatformBrowser(this.platformId)) {
-      localStorage.removeItem('auth_token');
-    }
-    if (message) {
-      alert(message);
-    }
-    this.router.navigate(['/login']);
+    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}).subscribe({
+      next: () => {
+        this.tokenSignal.set(null);
+        if (isPlatformBrowser(this.platformId)) {
+          localStorage.removeItem('auth_token');
+        }
+        if (message) {
+          alert(message);
+        }
+        this.router.navigate(['/login']);
+      },
+      error: () => {
+        // Even if logout fails, clear local token
+        this.tokenSignal.set(null);
+        if (isPlatformBrowser(this.platformId)) {
+          localStorage.removeItem('auth_token');
+        }
+        if (message) {
+          alert(message);
+        }
+        this.router.navigate(['/login']);
+      }
+    });
   }
 
   getToken(): string | null {

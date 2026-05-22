@@ -43,6 +43,10 @@ import { AuthService } from '../../core/services/auth.service';
               <mat-icon matListItemIcon>location_on</mat-icon>
               <span matListItemTitle>Saved Postal Codes</span>
             </a>
+            <a mat-list-item routerLink="/profile" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>person</mat-icon>
+              <span matListItemTitle>Profile</span>
+            </a>
           </mat-nav-list>
         </mat-sidenav>
 

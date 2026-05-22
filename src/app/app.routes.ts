@@ -14,6 +14,7 @@ export const routes: Routes = [
       { path: 'route-planner', loadComponent: () => import('./features/route-planner/route-planner.component').then(m => m.RoutePlannerComponent), canActivate: [authGuard] },
       { path: 'weekly-route', loadComponent: () => import('./features/weekly-route/weekly-route.component').then(m => m.WeeklyRouteComponent), canActivate: [authGuard] },
       { path: 'postal-codes', loadComponent: () => import('./features/postal-codes/postal-codes.component').then(m => m.PostalCodesComponent), canActivate: [authGuard] },
+      { path: 'profile', loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent), canActivate: [authGuard] },
       { path: '', redirectTo: 'route-planner', pathMatch: 'full' }
     ]
   },

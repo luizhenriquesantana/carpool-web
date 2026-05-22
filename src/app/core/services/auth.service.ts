@@ -22,6 +22,14 @@ export class AuthService {
       if (stored) {
         this.tokenSignal.set(stored);
       }
+      // Listen for localStorage changes (e.g., "Clear site data" in DevTools)
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'auth_token' && event.newValue === null) {
+          // Token was removed from localStorage
+          this.tokenSignal.set(null);
+          this.router.navigate(['/login'], { queryParams: { error: 'session_invalid' } });
+        }
+      });
     }
   }
 
@@ -43,30 +51,38 @@ export class AuthService {
     );
   }
 
-  logout(message?: string): void {
-    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}).subscribe({
+  logout(): void {
+    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}, { withCredentials: true }).subscribe({
       next: () => {
-        this.tokenSignal.set(null);
-        if (isPlatformBrowser(this.platformId)) {
-          localStorage.removeItem('auth_token');
-        }
-        if (message) {
-          alert(message);
-        }
-        this.router.navigate(['/login']);
+        this.clearAuthData();
       },
       error: () => {
         // Even if logout fails, clear local token
-        this.tokenSignal.set(null);
-        if (isPlatformBrowser(this.platformId)) {
-          localStorage.removeItem('auth_token');
-        }
-        if (message) {
-          alert(message);
-        }
-        this.router.navigate(['/login']);
+        this.clearAuthData();
       }
     });
+  }
+
+  private clearAuthData(): void {
+    this.tokenSignal.set(null);
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.removeItem('auth_token');
+      // Clear all cookies including session cookies to ensure clean state for next OAuth2 login
+      document.cookie.split(";").forEach(cookie => {
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
+        // Clear cookie for all paths and domains
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        // Also try clearing for parent domain
+        const domainParts = window.location.hostname.split('.');
+        if (domainParts.length > 2) {
+          const parentDomain = domainParts.slice(1).join('.');
+          document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=." + parentDomain;
+        }
+      });
+    }
+    this.router.navigate(['/login']);
   }
 
   getToken(): string | null {

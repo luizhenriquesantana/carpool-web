@@ -10,6 +10,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const token = authService.getToken();
 
+  // Check if token exists in localStorage (not just in memory)
+  // If user cleared site data, localStorage will be empty
+  const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
+  if (token && !storedToken) {
+    // Token was cleared from localStorage but still in memory (e.g., "Clear site data")
+    authService.logout();
+    router.navigate(['/login'], { queryParams: { error: 'session_invalid' } });
+    return throwError(() => new Error('Session expired'));
+  }
+
   if (token) {
     const cloned = req.clone({
       setHeaders: { Authorization: `Bearer ${token}` }
@@ -17,7 +28,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     return next(cloned).pipe(
       catchError(error => {
         if (error.status === 401) {
-          authService.logout('Your session has expired. Please log in again.');
+          authService.logout();
+          router.navigate(['/login'], { queryParams: { error: 'session_invalid' } });
         }
         return throwError(() => error);
       })

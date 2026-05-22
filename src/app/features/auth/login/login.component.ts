@@ -1,5 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, inject, signal, OnInit } from '@angular/core';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -175,10 +175,11 @@ import { environment } from '../../../../environments/environment';
     }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly socialAuthService = inject(SocialAuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   username = '';
   password = '';
@@ -187,6 +188,15 @@ export class LoginComponent {
   currentProvider = signal<'google' | 'github' | null>(null);
   error = signal('');
   hidePassword = signal(true);
+
+  ngOnInit(): void {
+    // Check if redirected due to invalid session
+    this.route.queryParams.subscribe(params => {
+      if (params['error'] === 'session_invalid') {
+        this.error.set('Your session is invalid. Please log in again.');
+      }
+    });
+  }
 
   signInWithGoogle(): void {
     this.socialAuthService.signInWithGoogle();

@@ -16,21 +16,45 @@ export class AuthService {
   readonly isAuthenticated = computed(() => !!this.tokenSignal());
   readonly token = computed(() => this.tokenSignal());
 
+  private storageCheckInterval: ReturnType<typeof setInterval> | null = null;
+
   constructor() {
     if (isPlatformBrowser(this.platformId)) {
       const stored = localStorage.getItem('auth_token');
       if (stored) {
         this.tokenSignal.set(stored);
       }
-      // Listen for localStorage changes (e.g., "Clear site data" in DevTools)
+      // Listen for localStorage changes from OTHER tabs
       window.addEventListener('storage', (event) => {
         if (event.key === 'auth_token' && event.newValue === null) {
-          // Token was removed from localStorage
-          this.tokenSignal.set(null);
-          this.router.navigate(['/login'], { queryParams: { error: 'session_invalid' } });
+          this.handleSessionInvalid();
+        }
+      });
+      // Poll localStorage every 500ms to detect "Clear site data" in the same tab
+      this.storageCheckInterval = setInterval(() => {
+        const hasMemoryToken = !!this.tokenSignal();
+        const hasStorageToken = !!localStorage.getItem('auth_token');
+        if (hasMemoryToken && !hasStorageToken) {
+          // localStorage was cleared but signal still has token
+          this.handleSessionInvalid();
+        }
+      }, 500);
+      // Also check when user returns to the tab
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          const hasMemoryToken = !!this.tokenSignal();
+          const hasStorageToken = !!localStorage.getItem('auth_token');
+          if (hasMemoryToken && !hasStorageToken) {
+            this.handleSessionInvalid();
+          }
         }
       });
     }
+  }
+
+  private handleSessionInvalid(): void {
+    this.tokenSignal.set(null);
+    this.router.navigate(['/login'], { queryParams: { error: 'session_invalid' } });
   }
 
   register(request: RegisterRequest): Observable<AuthResponse> {
@@ -64,6 +88,10 @@ export class AuthService {
   }
 
   private clearAuthData(): void {
+    if (this.storageCheckInterval) {
+      clearInterval(this.storageCheckInterval);
+      this.storageCheckInterval = null;
+    }
     this.tokenSignal.set(null);
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem('auth_token');
@@ -87,6 +115,13 @@ export class AuthService {
 
   getToken(): string | null {
     return this.tokenSignal();
+  }
+
+  setToken(token: string): void {
+    this.tokenSignal.set(token);
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('auth_token', token);
+    }
   }
 
   private storeToken(token: string): void {

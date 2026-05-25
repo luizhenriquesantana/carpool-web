@@ -3,6 +3,8 @@ export interface SavedPostalCode {
   label: string;
   postalCode: string;
   country: string;
+  createdAt?: string;
+  lastUsedAt?: string;
 }
 
 export interface SavedPostalCodeRequest {

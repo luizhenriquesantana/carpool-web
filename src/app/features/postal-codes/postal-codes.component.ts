@@ -8,8 +8,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { MatDialogModule } from '@angular/material/dialog';
+import { MatSelectModule } from '@angular/material/select';
 import { PostalCodeService } from '../../core/services/postal-code.service';
 import { SavedPostalCode } from '../../core/models/postal-code.model';
+import { COUNTRIES } from '../../core/constants/countries';
 
 @Component({
   selector: 'app-postal-codes',
@@ -18,7 +20,7 @@ import { SavedPostalCode } from '../../core/models/postal-code.model';
     FormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-    MatTableModule, MatDialogModule
+    MatTableModule, MatDialogModule, MatSelectModule
   ],
   template: `
     <div class="page-container">
@@ -45,7 +47,11 @@ import { SavedPostalCode } from '../../core/models/postal-code.model';
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Country</mat-label>
-              <input matInput [(ngModel)]="newCountry" placeholder="e.g. Ireland">
+              <mat-select [(ngModel)]="newCountry">
+                @for (c of countries; track c.code) {
+                  <mat-option [value]="c.code">{{ c.name }}</mat-option>
+                }
+              </mat-select>
             </mat-form-field>
             <button mat-raised-button color="primary" (click)="savePostalCode()"
                     [disabled]="saving() || !newLabel || !newPostalCode || !newCountry">
@@ -92,6 +98,16 @@ import { SavedPostalCode } from '../../core/models/postal-code.model';
             <ng-container matColumnDef="country">
               <th mat-header-cell *matHeaderCellDef>Country</th>
               <td mat-cell *matCellDef="let pc">{{ pc.country }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="createdAt">
+              <th mat-header-cell *matHeaderCellDef>Created</th>
+              <td mat-cell *matCellDef="let pc">{{ formatDate(pc.createdAt) }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="lastUsedAt">
+              <th mat-header-cell *matHeaderCellDef>Last Used</th>
+              <td mat-cell *matCellDef="let pc">{{ formatDate(pc.lastUsedAt) }}</td>
             </ng-container>
 
             <ng-container matColumnDef="actions">
@@ -152,9 +168,10 @@ export class PostalCodesComponent implements OnInit {
 
   newLabel = '';
   newPostalCode = '';
-  newCountry = 'Ireland';
+  countries = COUNTRIES;
+  newCountry = 'IE';
 
-  displayedColumns = ['label', 'postalCode', 'country', 'actions'];
+  displayedColumns = ['label', 'postalCode', 'country', 'createdAt', 'lastUsedAt', 'actions'];
 
   ngOnInit(): void {
     this.loadPostalCodes();
@@ -196,6 +213,12 @@ export class PostalCodesComponent implements OnInit {
         this.saving.set(false);
       }
     });
+  }
+
+  formatDate(dateStr: string | undefined): string {
+    if (!dateStr) return '—';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   deletePostalCode(id: string): void {

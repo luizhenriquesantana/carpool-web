@@ -12,8 +12,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { ClipboardModule, Clipboard } from '@angular/cdk/clipboard';
 import { RouteService } from '../../core/services/route.service';
 import { DayRequest, MemberRequest, WeeklyRouteResponse } from '../../core/models/route.model';
+import { COUNTRIES } from '../../core/constants/countries';
 
 interface MemberForm {
   name: string;
@@ -36,7 +39,8 @@ interface DayForm {
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatSelectModule,
     MatCheckboxModule, MatProgressSpinnerModule,
-    MatDividerModule, MatExpansionModule, MatChipsModule
+    MatDividerModule, MatExpansionModule, MatChipsModule,
+    MatSnackBarModule, ClipboardModule
   ],
   template: `
     <div class="page-container">
@@ -52,7 +56,11 @@ interface DayForm {
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Country</mat-label>
-                <input matInput [(ngModel)]="country" placeholder="e.g. Ireland">
+                <mat-select [(ngModel)]="country">
+                  @for (c of countries; track c.code) {
+                    <mat-option [value]="c.code">{{ c.name }}</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Office Name</mat-label>
@@ -178,11 +186,19 @@ interface DayForm {
                   </mat-expansion-panel-header>
 
                   <div class="day-detail">
+                    <div class="share-actions">
+                      <button mat-stroked-button color="primary" (click)="openDayGoogleMaps(day)">
+                        <mat-icon>open_in_new</mat-icon> Open in Google Maps
+                      </button>
+                      <button mat-stroked-button (click)="copyDayGoogleMapsLink(day)">
+                        <mat-icon>content_copy</mat-icon> Copy Link
+                      </button>
+                    </div>
                     <div class="stop-list">
                       <div class="stop-item driver">
                         <mat-icon>person</mat-icon>
                         <div>
-                          <strong>{{ day.driver.name }}</strong>
+                          <strong>1. {{ day.driver.name }}</strong>
                           <span class="stop-detail-text">{{ day.driver.postalCode }} (Driver)</span>
                         </div>
                       </div>
@@ -192,7 +208,7 @@ interface DayForm {
                         <div class="stop-item pickup">
                           <mat-icon>person_pin_circle</mat-icon>
                           <div>
-                            <strong>{{ i + 1 }}. {{ stop.name }}</strong>
+                            <strong>{{ i + 2 }}. {{ stop.name }}</strong>
                             <span class="stop-detail-text">{{ stop.postalCode }}</span>
                           </div>
                         </div>
@@ -202,7 +218,7 @@ interface DayForm {
                       <div class="stop-item office">
                         <mat-icon>business</mat-icon>
                         <div>
-                          <strong>{{ result()!.office.name }}</strong>
+                          <strong>{{ day.pickupOrder.length + 2 }}. {{ result()!.office.name }}</strong>
                           <span class="stop-detail-text">{{ result()!.office.postalCode }} (Office)</span>
                         </div>
                       </div>
@@ -222,17 +238,24 @@ interface DayForm {
     .form-grid { display: flex; flex-direction: column; gap: 16px; }
     .form-card { margin-bottom: 8px; }
     .form-row {
-      display: flex; gap: 16px;
-      mat-form-field { flex: 1; }
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      align-items: center;
     }
     .member-row {
-      display: flex; gap: 8px; align-items: center;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto 40px;
+      gap: 8px;
+      align-items: center;
     }
-    .member-field { flex: 1; }
     .day-row {
-      display: flex; gap: 16px; align-items: center; margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: 110px 1fr 1fr;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 8px;
     }
-    .day-field { flex: 1; }
     .add-btn { margin-top: 8px; }
     .actions { margin: 24px 0; text-align: center; }
     .plan-btn { height: 48px; font-size: 16px; padding: 0 32px; }
@@ -257,12 +280,18 @@ interface DayForm {
       mat-icon { color: #999; }
     }
     mat-panel-title mat-icon { margin-right: 8px; }
+    .share-actions {
+      display: flex; gap: 12px; margin-bottom: 12px; justify-content: center;
+    }
   `]
 })
 export class WeeklyRouteComponent {
   private readonly routeService = inject(RouteService);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly clipboard = inject(Clipboard);
 
-  country = 'Ireland';
+  countries = COUNTRIES;
+  country = 'IE';
   officeName = '';
   officePostalCode = '';
   members: MemberForm[] = [
@@ -289,6 +318,34 @@ export class WeeklyRouteComponent {
 
   removeMember(index: number): void {
     this.members = this.members.filter((_, i) => i !== index);
+  }
+
+  private buildGoogleMapsUrlForDay(day: any): string | null {
+    const office = this.result()?.office;
+    if (!office) return null;
+    const stops = [day.driver, ...day.pickupOrder, office];
+    if (stops.length < 2) return null;
+    const origin = `${stops[0].latitude},${stops[0].longitude}`;
+    const destination = `${stops[stops.length - 1].latitude},${stops[stops.length - 1].longitude}`;
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+    if (stops.length > 2) {
+      const waypoints = stops.slice(1, -1).map((s: any) => `${s.latitude},${s.longitude}`).join('|');
+      url += `&waypoints=${waypoints}`;
+    }
+    return url;
+  }
+
+  openDayGoogleMaps(day: any): void {
+    const url = this.buildGoogleMapsUrlForDay(day);
+    if (url) window.open(url, '_blank');
+  }
+
+  copyDayGoogleMapsLink(day: any): void {
+    const url = this.buildGoogleMapsUrlForDay(day);
+    if (url) {
+      this.clipboard.copy(url);
+      this.snackBar.open('Link copied to clipboard!', 'Dismiss', { duration: 3000 });
+    }
   }
 
   isFormValid(): boolean {

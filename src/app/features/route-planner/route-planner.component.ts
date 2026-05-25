@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -10,8 +10,16 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { ClipboardModule, Clipboard } from '@angular/cdk/clipboard';
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { RouteService } from '../../core/services/route.service';
-import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
+import { PostalCodeService } from '../../core/services/postal-code.service';
+import { ColleagueRequest, RouteResponse, ApiStop } from '../../core/models/route.model';
+import { SavedPostalCode } from '../../core/models/postal-code.model';
+import { RouteMapComponent } from '../../shared/components/route-map/route-map.component';
+import { COUNTRIES } from '../../core/constants/countries';
 
 @Component({
   selector: 'app-route-planner',
@@ -20,7 +28,9 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
     FormsModule, DecimalPipe,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatSelectModule,
-    MatProgressSpinnerModule, MatDividerModule, MatChipsModule
+    MatProgressSpinnerModule, MatDividerModule, MatChipsModule,
+    MatTooltipModule, MatSnackBarModule, ClipboardModule, MatAutocompleteModule,
+    RouteMapComponent
   ],
   template: `
     <div class="page-container">
@@ -36,7 +46,11 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Country</mat-label>
-                <input matInput [(ngModel)]="country" placeholder="e.g. Ireland">
+                <mat-select [(ngModel)]="country">
+                  @for (c of countries; track c.code) {
+                    <mat-option [value]="c.code">{{ c.name }}</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -46,30 +60,55 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
                   <mat-option value="EVENING_TO_HOME">Evening to Home</mat-option>
                 </mat-select>
               </mat-form-field>
+              <span style="width: 40px; display: inline-block;"></span>
             </div>
 
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Driver Name</mat-label>
-                <input matInput [(ngModel)]="driverName">
+                <input matInput [(ngModel)]="driverName"
+                       [matAutocomplete]="auto"
+                       (focus)="setActiveField('driver')"
+                       (input)="updateFilter($event)">
               </mat-form-field>
 
               <mat-form-field appearance="outline">
                 <mat-label>Driver Postal Code</mat-label>
-                <input matInput [(ngModel)]="driverPostalCode">
+                <input matInput [(ngModel)]="driverPostalCode"
+                       [matAutocomplete]="auto"
+                       (focus)="setActiveField('driver')"
+                       (input)="updateFilter($event)">
               </mat-form-field>
+              <button mat-icon-button color="primary"
+                      (click)="savePostalCode(driverName, driverPostalCode)"
+                      [disabled]="!driverName || !driverPostalCode || isAlreadySaved(driverPostalCode)"
+                      matTooltip="Save to Saved Postal Codes">
+                <mat-icon>bookmark_add</mat-icon>
+              </button>
             </div>
 
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Office Name</mat-label>
-                <input matInput [(ngModel)]="officeName">
+                <input matInput [(ngModel)]="officeName"
+                       [matAutocomplete]="auto"
+                       (focus)="setActiveField('office')"
+                       (input)="updateFilter($event)">
               </mat-form-field>
 
               <mat-form-field appearance="outline">
                 <mat-label>Office Postal Code</mat-label>
-                <input matInput [(ngModel)]="officePostalCode">
+                <input matInput [(ngModel)]="officePostalCode"
+                       [matAutocomplete]="auto"
+                       (focus)="setActiveField('office')"
+                       (input)="updateFilter($event)">
               </mat-form-field>
+              <button mat-icon-button color="primary"
+                      (click)="savePostalCode(officeName, officePostalCode)"
+                      [disabled]="!officeName || !officePostalCode || isAlreadySaved(officePostalCode)"
+                      matTooltip="Save to Saved Postal Codes">
+                <mat-icon>bookmark_add</mat-icon>
+              </button>
             </div>
           </mat-card-content>
         </mat-card>
@@ -83,12 +122,24 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
               <div class="colleague-row">
                 <mat-form-field appearance="outline" class="colleague-field">
                   <mat-label>Name</mat-label>
-                  <input matInput [(ngModel)]="colleague.name" [name]="'cname' + $index">
+                  <input matInput [(ngModel)]="colleague.name" [name]="'cname' + $index"
+                         [matAutocomplete]="auto"
+                         (focus)="setActiveField('colleague', $index)"
+                         (input)="updateFilter($event)">
                 </mat-form-field>
                 <mat-form-field appearance="outline" class="colleague-field">
                   <mat-label>Postal Code</mat-label>
-                  <input matInput [(ngModel)]="colleague.postalCode" [name]="'cpc' + $index">
+                  <input matInput [(ngModel)]="colleague.postalCode" [name]="'cpc' + $index"
+                         [matAutocomplete]="auto"
+                         (focus)="setActiveField('colleague', $index)"
+                         (input)="updateFilter($event)">
                 </mat-form-field>
+                <button mat-icon-button color="primary"
+                        (click)="savePostalCode(colleague.name, colleague.postalCode)"
+                        [disabled]="!colleague.name || !colleague.postalCode || isAlreadySaved(colleague.postalCode)"
+                        matTooltip="Save to Saved Postal Codes">
+                  <mat-icon>bookmark_add</mat-icon>
+                </button>
                 <button mat-icon-button color="warn" (click)="removeColleague($index)"
                         [disabled]="colleagues.length <= 1">
                   <mat-icon>delete</mat-icon>
@@ -101,6 +152,12 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
             </button>
           </mat-card-content>
         </mat-card>
+
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onOptionSelected($event)">
+          @for (pc of filteredPostalCodes(); track pc.id) {
+            <mat-option [value]="pc.postalCode">{{ pc.label }} — {{ pc.postalCode }}</mat-option>
+          }
+        </mat-autocomplete>
       </div>
 
       <div class="actions">
@@ -119,6 +176,19 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
       }
 
       @if (result()) {
+        <app-route-map [stops]="routeStops()"></app-route-map>
+
+        @if (googleMapsUrl()) {
+          <div class="share-actions">
+            <button mat-stroked-button color="primary" (click)="openGoogleMaps()">
+              <mat-icon>open_in_new</mat-icon> Open in Google Maps
+            </button>
+            <button mat-stroked-button (click)="copyGoogleMapsLink()">
+              <mat-icon>content_copy</mat-icon> Copy Link
+            </button>
+          </div>
+        }
+
         <mat-card class="result-card">
           <mat-card-header>
             <mat-card-title>Optimized Route</mat-card-title>
@@ -152,7 +222,7 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
                 <div class="stop-item driver">
                   <mat-icon>person</mat-icon>
                   <div>
-                    <strong>{{ result()!.driver.name }}</strong>
+                    <strong>1. {{ result()!.driver.name }}</strong>
                     <span class="stop-detail">{{ result()!.driver.postalCode }} (Driver Start)</span>
                   </div>
                 </div>
@@ -164,7 +234,7 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
                   <div class="stop-item pickup">
                     <mat-icon>person_pin_circle</mat-icon>
                     <div>
-                      <strong>{{ i + 1 }}. {{ stop.name }}</strong>
+                      <strong>{{ i + 2 }}. {{ stop.name }}</strong>
                       <span class="stop-detail">{{ stop.postalCode }}</span>
                     </div>
                   </div>
@@ -176,7 +246,7 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
                 <div class="stop-item office">
                   <mat-icon>business</mat-icon>
                   <div>
-                    <strong>{{ result()!.office.name }}</strong>
+                    <strong>{{ result()!.pickupOrder.length + 2 }}. {{ result()!.office.name }}</strong>
                     <span class="stop-detail">{{ result()!.office.postalCode }} (Destination)</span>
                   </div>
                 </div>
@@ -193,13 +263,17 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
     .form-grid { display: flex; flex-direction: column; gap: 16px; }
     .form-card { margin-bottom: 8px; }
     .form-row {
-      display: flex; gap: 16px;
-      mat-form-field { flex: 1; }
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 16px;
+      align-items: center;
     }
     .colleague-row {
-      display: flex; gap: 8px; align-items: center;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 8px;
+      align-items: center;
     }
-    .colleague-field { flex: 1; }
     .add-btn { margin-top: 8px; }
     .actions { margin: 24px 0; text-align: center; }
     .plan-btn { height: 48px; font-size: 16px; padding: 0 32px; }
@@ -231,12 +305,33 @@ import { ColleagueRequest, RouteResponse } from '../../core/models/route.model';
       display: flex; justify-content: center;
       mat-icon { color: #999; }
     }
+    .share-actions {
+      display: flex; gap: 12px; margin-top: 16px; justify-content: center;
+    }
   `]
 })
 export class RoutePlannerComponent {
   private readonly routeService = inject(RouteService);
+  private readonly postalCodeService = inject(PostalCodeService);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly clipboard = inject(Clipboard);
 
-  country = 'Ireland';
+  savedPostalCodes = signal<SavedPostalCode[]>([]);
+  autocompleteFilter = signal('');
+  activeFieldType = signal<'driver' | 'office' | 'colleague' | null>(null);
+  activeFieldIndex = signal<number>(-1);
+
+  filteredPostalCodes = computed(() => {
+    const filter = this.autocompleteFilter().toLowerCase().trim();
+    if (!filter) return this.savedPostalCodes();
+    return this.savedPostalCodes().filter(pc =>
+      pc.postalCode.toLowerCase().includes(filter) ||
+      pc.label.toLowerCase().includes(filter)
+    );
+  });
+
+  countries = COUNTRIES;
+  country = 'IE';
   driverName = '';
   driverPostalCode = '';
   officeName = '';
@@ -248,12 +343,107 @@ export class RoutePlannerComponent {
   error = signal('');
   result = signal<RouteResponse | null>(null);
 
+  routeStops = computed<ApiStop[]>(() => {
+    const res = this.result();
+    if (!res) return [];
+    return [res.driver, ...res.pickupOrder, res.office];
+  });
+
+  googleMapsUrl = computed<string | null>(() => {
+    const stops = this.routeStops();
+    if (stops.length < 2) return null;
+    const origin = `${stops[0].latitude},${stops[0].longitude}`;
+    const destination = `${stops[stops.length - 1].latitude},${stops[stops.length - 1].longitude}`;
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+    if (stops.length > 2) {
+      const waypoints = stops.slice(1, -1).map(s => `${s.latitude},${s.longitude}`).join('|');
+      url += `&waypoints=${waypoints}`;
+    }
+    return url;
+  });
+
+  constructor() {
+    this.loadSavedPostalCodes();
+  }
+
+  loadSavedPostalCodes(): void {
+    this.postalCodeService.list().subscribe({
+      next: (codes) => this.savedPostalCodes.set(codes),
+      error: () => this.savedPostalCodes.set([])
+    });
+  }
+
+  setActiveField(type: 'driver' | 'office' | 'colleague', index: number = -1): void {
+    this.activeFieldType.set(type);
+    this.activeFieldIndex.set(index);
+  }
+
+  updateFilter(event: Event): void {
+    this.autocompleteFilter.set((event.target as HTMLInputElement).value);
+  }
+
+  onOptionSelected(event: MatAutocompleteSelectedEvent): void {
+    const postalCode = event.option.value as string;
+    const pc = this.savedPostalCodes().find(p => p.postalCode === postalCode);
+    if (!pc) return;
+
+    const type = this.activeFieldType();
+    const index = this.activeFieldIndex();
+
+    switch (type) {
+      case 'driver':
+        this.driverName = pc.label;
+        this.driverPostalCode = pc.postalCode;
+        break;
+      case 'office':
+        this.officeName = pc.label;
+        this.officePostalCode = pc.postalCode;
+        break;
+      case 'colleague':
+        if (index >= 0 && index < this.colleagues.length) {
+          this.colleagues[index].name = pc.label;
+          this.colleagues[index].postalCode = pc.postalCode;
+        }
+        break;
+    }
+  }
+
+  isAlreadySaved(postalCode: string): boolean {
+    return this.savedPostalCodes().some(pc => pc.postalCode === postalCode && pc.country === this.country);
+  }
+
   addColleague(): void {
     this.colleagues = [...this.colleagues, { name: '', postalCode: '' }];
   }
 
   removeColleague(index: number): void {
     this.colleagues = this.colleagues.filter((_, i) => i !== index);
+  }
+
+  openGoogleMaps(): void {
+    const url = this.googleMapsUrl();
+    if (url) window.open(url, '_blank');
+  }
+
+  copyGoogleMapsLink(): void {
+    const url = this.googleMapsUrl();
+    if (url) {
+      this.clipboard.copy(url);
+      this.snackBar.open('Link copied to clipboard!', 'Dismiss', { duration: 3000 });
+    }
+  }
+
+  savePostalCode(label: string, postalCode: string): void {
+    if (!label || !postalCode) return;
+    this.postalCodeService.save({ label, postalCode, country: this.country }).subscribe({
+      next: () => {
+        this.snackBar.open(`Saved "${label}" to Postal Codes`, 'Dismiss', { duration: 3000 });
+        this.loadSavedPostalCodes();
+      },
+      error: (err) => {
+        this.snackBar.open(`Failed to save: ${err.message || 'Unknown error'}`, 'Dismiss', { duration: 5000 });
+      }
+    });
   }
 
   isFormValid(): boolean {

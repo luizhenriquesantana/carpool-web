@@ -58,7 +58,7 @@ interface DayForm {
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Country</mat-label>
-                <mat-select [(ngModel)]="country">
+                <mat-select [ngModel]="country()" (ngModelChange)="country.set($event)">
                   @for (c of countries; track c.code) {
                     <mat-option [value]="c.code">{{ c.name }}</mat-option>
                   }
@@ -316,7 +316,7 @@ export class WeeklyRouteComponent {
   private readonly clipboard = inject(Clipboard);
 
   countries = COUNTRIES;
-  country = 'IE';
+  country = signal('IE');
   officeName = '';
   officePostalCode = '';
   officeStreet = '';
@@ -326,7 +326,7 @@ export class WeeklyRouteComponent {
     { name: '', postalCode: '', canDrive: false }
   ];
 
-  isBrazil = computed(() => this.country === 'BR');
+  isBrazil = computed(() => this.country() === 'BR');
   days: DayForm[] = [
     { day: 'Monday', fixedDriverName: '', tripType: '', enabled: true },
     { day: 'Tuesday', fixedDriverName: '', tripType: '', enabled: true },
@@ -417,7 +417,7 @@ export class WeeklyRouteComponent {
     });
 
     const request: import('../../core/models/route.model').WeeklyRouteRequest = {
-      country: this.country,
+      country: this.country(),
       officeName: this.officeName,
       officePostalCode: this.officePostalCode,
       members: memberRequests,

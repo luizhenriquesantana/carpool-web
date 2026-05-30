@@ -46,7 +46,7 @@ import { COUNTRIES } from '../../core/constants/countries';
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Country</mat-label>
-                <mat-select [(ngModel)]="country">
+                <mat-select [ngModel]="country()" (ngModelChange)="country.set($event)">
                   @for (c of countries; track c.code) {
                     <mat-option [value]="c.code">{{ c.name }}</mat-option>
                   }
@@ -353,15 +353,21 @@ export class RoutePlannerComponent {
 
   filteredPostalCodes = computed(() => {
     const filter = this.autocompleteFilter().toLowerCase().trim();
-    if (!filter) return this.savedPostalCodes();
-    return this.savedPostalCodes().filter(pc =>
+    const currentCountry = this.country();
+
+    // First filter by country, then by text
+    let filtered = this.savedPostalCodes().filter(pc => pc.country === currentCountry);
+
+    if (!filter) return filtered;
+
+    return filtered.filter(pc =>
       pc.postalCode.toLowerCase().includes(filter) ||
       pc.label.toLowerCase().includes(filter)
     );
   });
 
   countries = COUNTRIES;
-  country = 'IE';
+  country = signal('IE');
   driverName = '';
   driverPostalCode = '';
   driverStreet = '';
@@ -373,7 +379,7 @@ export class RoutePlannerComponent {
   tripType = 'MORNING_TO_OFFICE';
   colleagues: ColleagueRequest[] = [{ name: '', postalCode: '' }];
 
-  isBrazil = computed(() => this.country === 'BR');
+  isBrazil = computed(() => this.country() === 'BR');
 
   loading = signal(false);
   error = signal('');
@@ -426,6 +432,12 @@ export class RoutePlannerComponent {
     const type = this.activeFieldType();
     const index = this.activeFieldIndex();
 
+    // Check if we're switching countries - if so, clear street fields
+    const isDifferentCountry = pc.country && pc.country !== this.country();
+    if (isDifferentCountry) {
+      this.country.set(pc.country || 'IE');
+    }
+
     switch (type) {
       case 'driver':
         this.driverName = pc.label;
@@ -451,7 +463,7 @@ export class RoutePlannerComponent {
   }
 
   isAlreadySaved(postalCode: string): boolean {
-    return this.savedPostalCodes().some(pc => pc.postalCode === postalCode && pc.country === this.country);
+    return this.savedPostalCodes().some(pc => pc.postalCode === postalCode && pc.country === this.country());
   }
 
   addColleague(): void {
@@ -482,7 +494,7 @@ export class RoutePlannerComponent {
 
   savePostalCode(label: string, postalCode: string): void {
     if (!label || !postalCode) return;
-    this.postalCodeService.save({ label, postalCode, country: this.country }).subscribe({
+    this.postalCodeService.save({ label, postalCode, country: this.country() }).subscribe({
       next: () => {
         this.snackBar.open(`Saved "${label}" to Postal Codes`, 'Dismiss', { duration: 3000 });
         this.loadSavedPostalCodes();
@@ -506,7 +518,7 @@ export class RoutePlannerComponent {
     this.result.set(null);
 
     const request: RouteRequest = {
-      country: this.country,
+      country: this.country(),
       driverName: this.driverName,
       driverPostalCode: this.driverPostalCode,
       officeName: this.officeName,

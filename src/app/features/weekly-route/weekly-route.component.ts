@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
@@ -22,6 +22,8 @@ interface MemberForm {
   name: string;
   postalCode: string;
   canDrive: boolean;
+  street?: string;
+  houseNumber?: string;
 }
 
 interface DayForm {
@@ -71,6 +73,19 @@ interface DayForm {
                 <input matInput [(ngModel)]="officePostalCode">
               </mat-form-field>
             </div>
+            @if (isBrazil()) {
+              <div class="form-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Office Street</mat-label>
+                  <input matInput [(ngModel)]="officeStreet" placeholder="e.g. Av. Paulista">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Office Number</mat-label>
+                  <input matInput [(ngModel)]="officeHouseNumber" placeholder="e.g. 1000">
+                </mat-form-field>
+                <span></span>
+              </div>
+            }
           </mat-card-content>
         </mat-card>
 
@@ -89,6 +104,16 @@ interface DayForm {
                   <mat-label>Postal Code</mat-label>
                   <input matInput [(ngModel)]="member.postalCode" [name]="'mpc' + $index">
                 </mat-form-field>
+                @if (isBrazil()) {
+                  <mat-form-field appearance="outline">
+                    <mat-label>Street</mat-label>
+                    <input matInput [(ngModel)]="member.street" [name]="'mstreet' + $index" placeholder="e.g. Rua Augusta">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" style="min-width: 80px;">
+                    <mat-label>Number</mat-label>
+                    <input matInput [(ngModel)]="member.houseNumber" [name]="'mnum' + $index" placeholder="e.g. 123">
+                  </mat-form-field>
+                }
                 <mat-checkbox [(ngModel)]="member.canDrive" [name]="'mcd' + $index">
                   Can Drive
                 </mat-checkbox>
@@ -294,10 +319,14 @@ export class WeeklyRouteComponent {
   country = 'IE';
   officeName = '';
   officePostalCode = '';
+  officeStreet = '';
+  officeHouseNumber = '';
   members: MemberForm[] = [
     { name: '', postalCode: '', canDrive: true },
     { name: '', postalCode: '', canDrive: false }
   ];
+
+  isBrazil = computed(() => this.country === 'BR');
   days: DayForm[] = [
     { day: 'Monday', fixedDriverName: '', tripType: '', enabled: true },
     { day: 'Tuesday', fixedDriverName: '', tripType: '', enabled: true },
@@ -313,7 +342,12 @@ export class WeeklyRouteComponent {
   driverAssignmentEntries = signal<[string, number][]>([]);
 
   addMember(): void {
-    this.members = [...this.members, { name: '', postalCode: '', canDrive: false }];
+    const newMember: MemberForm = { name: '', postalCode: '', canDrive: false };
+    if (this.isBrazil()) {
+      newMember.street = '';
+      newMember.houseNumber = '';
+    }
+    this.members = [...this.members, newMember];
   }
 
   removeMember(index: number): void {
@@ -369,19 +403,33 @@ export class WeeklyRouteComponent {
         }))
       : undefined;
 
-    const memberRequests: MemberRequest[] = this.members.map(m => ({
-      name: m.name,
-      postalCode: m.postalCode,
-      canDrive: m.canDrive
-    }));
+    const memberRequests: MemberRequest[] = this.members.map(m => {
+      const req: MemberRequest = {
+        name: m.name,
+        postalCode: m.postalCode,
+        canDrive: m.canDrive
+      };
+      if (this.isBrazil()) {
+        req.street = m.street || undefined;
+        req.houseNumber = m.houseNumber || undefined;
+      }
+      return req;
+    });
 
-    this.routeService.planWeeklyRoute({
+    const request: import('../../core/models/route.model').WeeklyRouteRequest = {
       country: this.country,
       officeName: this.officeName,
       officePostalCode: this.officePostalCode,
       members: memberRequests,
       days: dayRequests
-    }).subscribe({
+    };
+
+    if (this.isBrazil()) {
+      request.officeStreet = this.officeStreet || undefined;
+      request.officeHouseNumber = this.officeHouseNumber || undefined;
+    }
+
+    this.routeService.planWeeklyRoute(request).subscribe({
       next: (res) => {
         this.result.set(res);
         this.driverAssignmentEntries.set(

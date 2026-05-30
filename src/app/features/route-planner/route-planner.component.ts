@@ -16,7 +16,7 @@ import { ClipboardModule, Clipboard } from '@angular/cdk/clipboard';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { RouteService } from '../../core/services/route.service';
 import { PostalCodeService } from '../../core/services/postal-code.service';
-import { ColleagueRequest, RouteResponse, ApiStop } from '../../core/models/route.model';
+import { ColleagueRequest, RouteRequest, RouteResponse, ApiStop } from '../../core/models/route.model';
 import { SavedPostalCode } from '../../core/models/postal-code.model';
 import { RouteMapComponent } from '../../shared/components/route-map/route-map.component';
 import { COUNTRIES } from '../../core/constants/countries';
@@ -79,6 +79,16 @@ import { COUNTRIES } from '../../core/constants/countries';
                        (focus)="setActiveField('driver')"
                        (input)="updateFilter($event)">
               </mat-form-field>
+              @if (isBrazil()) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Street</mat-label>
+                  <input matInput [(ngModel)]="driverStreet" placeholder="e.g. Rua Augusta">
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="min-width: 80px;">
+                  <mat-label>Number</mat-label>
+                  <input matInput [(ngModel)]="driverHouseNumber" placeholder="e.g. 123">
+                </mat-form-field>
+              }
               <button mat-icon-button color="primary"
                       (click)="savePostalCode(driverName, driverPostalCode)"
                       [disabled]="!driverName || !driverPostalCode || isAlreadySaved(driverPostalCode)"
@@ -103,6 +113,16 @@ import { COUNTRIES } from '../../core/constants/countries';
                        (focus)="setActiveField('office')"
                        (input)="updateFilter($event)">
               </mat-form-field>
+              @if (isBrazil()) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Street</mat-label>
+                  <input matInput [(ngModel)]="officeStreet" placeholder="e.g. Av. Paulista">
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="min-width: 80px;">
+                  <mat-label>Number</mat-label>
+                  <input matInput [(ngModel)]="officeHouseNumber" placeholder="e.g. 1000">
+                </mat-form-field>
+              }
               <button mat-icon-button color="primary"
                       (click)="savePostalCode(officeName, officePostalCode)"
                       [disabled]="!officeName || !officePostalCode || isAlreadySaved(officePostalCode)"
@@ -134,6 +154,16 @@ import { COUNTRIES } from '../../core/constants/countries';
                          (focus)="setActiveField('colleague', $index)"
                          (input)="updateFilter($event)">
                 </mat-form-field>
+                @if (isBrazil()) {
+                  <mat-form-field appearance="outline">
+                    <mat-label>Street</mat-label>
+                    <input matInput [(ngModel)]="colleague.street" [name]="'cstreet' + $index" placeholder="e.g. Rua Oscar Freire">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" style="min-width: 80px;">
+                    <mat-label>Number</mat-label>
+                    <input matInput [(ngModel)]="colleague.houseNumber" [name]="'cnum' + $index" placeholder="e.g. 456">
+                  </mat-form-field>
+                }
                 <button mat-icon-button color="primary"
                         (click)="savePostalCode(colleague.name, colleague.postalCode)"
                         [disabled]="!colleague.name || !colleague.postalCode || isAlreadySaved(colleague.postalCode)"
@@ -334,10 +364,16 @@ export class RoutePlannerComponent {
   country = 'IE';
   driverName = '';
   driverPostalCode = '';
+  driverStreet = '';
+  driverHouseNumber = '';
   officeName = '';
   officePostalCode = '';
+  officeStreet = '';
+  officeHouseNumber = '';
   tripType = 'MORNING_TO_OFFICE';
   colleagues: ColleagueRequest[] = [{ name: '', postalCode: '' }];
+
+  isBrazil = computed(() => this.country === 'BR');
 
   loading = signal(false);
   error = signal('');
@@ -394,15 +430,21 @@ export class RoutePlannerComponent {
       case 'driver':
         this.driverName = pc.label;
         this.driverPostalCode = pc.postalCode;
+        this.driverStreet = '';
+        this.driverHouseNumber = '';
         break;
       case 'office':
         this.officeName = pc.label;
         this.officePostalCode = pc.postalCode;
+        this.officeStreet = '';
+        this.officeHouseNumber = '';
         break;
       case 'colleague':
         if (index >= 0 && index < this.colleagues.length) {
           this.colleagues[index].name = pc.label;
           this.colleagues[index].postalCode = pc.postalCode;
+          this.colleagues[index].street = '';
+          this.colleagues[index].houseNumber = '';
         }
         break;
     }
@@ -413,7 +455,12 @@ export class RoutePlannerComponent {
   }
 
   addColleague(): void {
-    this.colleagues = [...this.colleagues, { name: '', postalCode: '' }];
+    const newColleague: ColleagueRequest = { name: '', postalCode: '' };
+    if (this.isBrazil()) {
+      newColleague.street = '';
+      newColleague.houseNumber = '';
+    }
+    this.colleagues = [...this.colleagues, newColleague];
   }
 
   removeColleague(index: number): void {
@@ -458,7 +505,7 @@ export class RoutePlannerComponent {
     this.error.set('');
     this.result.set(null);
 
-    this.routeService.planRoute({
+    const request: RouteRequest = {
       country: this.country,
       driverName: this.driverName,
       driverPostalCode: this.driverPostalCode,
@@ -466,7 +513,16 @@ export class RoutePlannerComponent {
       officePostalCode: this.officePostalCode,
       tripType: this.tripType,
       colleagues: this.colleagues
-    }).subscribe({
+    };
+
+    if (this.isBrazil()) {
+      request.driverStreet = this.driverStreet || undefined;
+      request.driverHouseNumber = this.driverHouseNumber || undefined;
+      request.officeStreet = this.officeStreet || undefined;
+      request.officeHouseNumber = this.officeHouseNumber || undefined;
+    }
+
+    this.routeService.planRoute(request).subscribe({
       next: (res) => {
         this.result.set(res);
         this.loading.set(false);

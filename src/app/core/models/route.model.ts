@@ -1,14 +1,20 @@
 export interface ColleagueRequest {
   name: string;
   postalCode: string;
+  street?: string;
+  houseNumber?: string;
 }
 
 export interface RouteRequest {
   country: string;
   driverName: string;
   driverPostalCode: string;
+  driverStreet?: string;
+  driverHouseNumber?: string;
   officeName: string;
   officePostalCode: string;
+  officeStreet?: string;
+  officeHouseNumber?: string;
   tripType: string;
   colleagues: ColleagueRequest[];
 }
@@ -17,6 +23,8 @@ export interface MemberRequest {
   name: string;
   postalCode: string;
   canDrive: boolean;
+  street?: string;
+  houseNumber?: string;
 }
 
 export interface DayRequest {
@@ -29,6 +37,8 @@ export interface WeeklyRouteRequest {
   country: string;
   officeName: string;
   officePostalCode: string;
+  officeStreet?: string;
+  officeHouseNumber?: string;
   members: MemberRequest[];
   days?: DayRequest[];
 }

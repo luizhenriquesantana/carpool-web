@@ -96,6 +96,7 @@ import { environment } from '../../../../environments/environment';
         </mat-card-content>
 
         <mat-card-actions align="end">
+          <a mat-button routerLink="/forgot-password">Forgot Password?</a>
           <a mat-button routerLink="/register">Don't have an account? Register</a>
         </mat-card-actions>
       </mat-card>

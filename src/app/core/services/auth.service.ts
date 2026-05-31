@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, LoginRequest, RegisterRequest, SocialLoginRequest } from '../models/auth.model';
+import { AuthResponse, LoginRequest, RegisterRequest, SocialLoginRequest, UserProfile, ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest, PasswordResetResponse } from '../models/auth.model';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -129,5 +129,21 @@ export class AuthService {
     if (isPlatformBrowser(this.platformId)) {
       localStorage.setItem('auth_token', token);
     }
+  }
+
+  getProfile(): Observable<UserProfile> {
+    return this.http.get<UserProfile>(`${environment.apiUrl}/api/auth/profile`);
+  }
+
+  changePassword(request: ChangePasswordRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/api/auth/change-password`, request);
+  }
+
+  forgotPassword(request: ForgotPasswordRequest): Observable<PasswordResetResponse> {
+    return this.http.post<PasswordResetResponse>(`${environment.apiUrl}/api/auth/forgot-password`, request);
+  }
+
+  resetPassword(request: ResetPasswordRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/api/auth/reset-password`, request);
   }
 }

@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDividerModule } from '@angular/material/divider';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 
@@ -16,6 +17,7 @@ interface ProfileResponse {
   provider: string;
   memberSince: string;
   lastLogin: string;
+  hasLocalPassword: boolean;
 }
 
 @Component({
@@ -24,7 +26,8 @@ interface ProfileResponse {
   imports: [
     FormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, MatIconModule, MatProgressSpinnerModule
+    MatButtonModule, MatIconModule, MatProgressSpinnerModule,
+    MatDividerModule
   ],
   template: `
     <div class="profile-container">
@@ -100,6 +103,82 @@ interface ProfileResponse {
                 Save Changes
               }
             </button>
+
+            @if (showSecuritySection()) {
+              <mat-divider class="divider"></mat-divider>
+
+              <h3>Security</h3>
+
+              @if (hasLocalPassword()) {
+                <button mat-stroked-button color="accent" class="change-password-btn"
+                        (click)="showChangePassword = true">
+                  <mat-icon>lock</mat-icon>
+                  Change Password
+                </button>
+              } @else {
+                <p class="oauth-password-info">
+                  <mat-icon>info</mat-icon>
+                  You signed up with {{ provider() }}. You can add a local password to log in either way.
+                </p>
+                <button mat-stroked-button color="accent" class="change-password-btn"
+                        (click)="goToSetPassword()">
+                  <mat-icon>add</mat-icon>
+                  Set Local Password
+                </button>
+              }
+
+              @if (showChangePassword) {
+                <div class="change-password-section">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Current Password</mat-label>
+                    <input matInput [(ngModel)]="currentPassword" name="currentPassword" required
+                           [type]="hidePassword() ? 'password' : 'text'">
+                    <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())">
+                      <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                    </button>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>New Password</mat-label>
+                    <input matInput [(ngModel)]="newPassword" name="newPassword" required
+                           [type]="hidePassword() ? 'password' : 'text'" minlength="6">
+                    <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())">
+                      <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                    </button>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Confirm New Password</mat-label>
+                    <input matInput [(ngModel)]="confirmPassword" name="confirmPassword" required
+                           [type]="hidePassword() ? 'password' : 'text'">
+                    <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())">
+                      <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                    </button>
+                  </mat-form-field>
+
+                  @if (passwordError()) {
+                    <div class="error-message">{{ passwordError() }}</div>
+                  }
+
+                  @if (passwordSuccess()) {
+                    <div class="success-message">{{ passwordSuccess() }}</div>
+                  }
+
+                  <div class="change-password-actions">
+                    <button mat-button (click)="showChangePassword = false">Cancel</button>
+                    <button mat-raised-button color="primary"
+                            [disabled]="!currentPassword || !newPassword || !confirmPassword || changingPassword()"
+                            (click)="changePassword()">
+                      @if (changingPassword()) {
+                        <mat-spinner diameter="20"></mat-spinner>
+                      } @else {
+                        Update Password
+                      }
+                    </button>
+                  </div>
+                </div>
+              }
+            }
           }
         </mat-card-content>
       </mat-card>
@@ -154,6 +233,46 @@ interface ProfileResponse {
       margin-bottom: 16px;
       font-size: 14px;
     }
+    .divider {
+      margin: 24px 0;
+    }
+    .change-password-btn {
+      width: 100%;
+      height: 48px;
+      margin-top: 8px;
+    }
+    .change-password-section {
+      background: #f5f5f5;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+    .change-password-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+    .oauth-password-info {
+      background: #e3f2fd;
+      color: #1565c0;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .oauth-password-info mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+    h3 {
+      margin: 0 0 16px 0;
+      color: #333;
+    }
     mat-card-header {
       margin-bottom: 16px;
     }
@@ -168,10 +287,25 @@ export class ProfileComponent implements OnInit {
   provider = signal('');
   memberSince = signal('');
   lastLogin = signal('');
+  hasLocalPassword = signal(false);
   loading = signal(true);
   saving = signal(false);
   error = signal('');
   success = signal('');
+
+  // Password change fields
+  showChangePassword = false;
+  currentPassword = '';
+  newPassword = '';
+  confirmPassword = '';
+  hidePassword = signal(true);
+  changingPassword = signal(false);
+  passwordError = signal('');
+  passwordSuccess = signal('');
+
+  showSecuritySection(): boolean {
+    return this.isLocalUser() || !this.hasLocalPassword();
+  }
 
   ngOnInit(): void {
     this.loadProfile();
@@ -188,6 +322,7 @@ export class ProfileComponent implements OnInit {
         this.provider.set(this.capitalize(profile.provider));
         this.memberSince.set(this.formatDate(profile.memberSince));
         this.lastLogin.set(this.formatDate(profile.lastLogin));
+        this.hasLocalPassword.set(profile.hasLocalPassword);
         this.loading.set(false);
       },
       error: (err) => {
@@ -215,6 +350,57 @@ export class ProfileComponent implements OnInit {
       error: (err) => {
         this.saving.set(false);
         this.error.set(err.error?.error || 'Failed to update profile.');
+      }
+    });
+  }
+
+  isLocalUser(): boolean {
+    return this.provider().toLowerCase() === 'Local' || this.provider().toLowerCase() === 'local';
+  }
+
+  goToSetPassword(): void {
+    // Navigate to forgot-password with email pre-filled
+    this.router.navigate(['/forgot-password'], { 
+      queryParams: { email: this.email() } 
+    });
+  }
+
+  changePassword(): void {
+    if (!this.currentPassword || !this.newPassword || !this.confirmPassword) {
+      this.passwordError.set('All fields are required.');
+      return;
+    }
+    if (this.newPassword !== this.confirmPassword) {
+      this.passwordError.set('New passwords do not match.');
+      return;
+    }
+    if (this.newPassword.length < 6) {
+      this.passwordError.set('Password must be at least 6 characters.');
+      return;
+    }
+
+    this.changingPassword.set(true);
+    this.passwordError.set('');
+    this.passwordSuccess.set('');
+
+    this.http.post(`${environment.apiUrl}/api/auth/change-password`, {
+      currentPassword: this.currentPassword,
+      newPassword: this.newPassword
+    }).subscribe({
+      next: () => {
+        this.changingPassword.set(false);
+        this.passwordSuccess.set('Password changed successfully!');
+        this.currentPassword = '';
+        this.newPassword = '';
+        this.confirmPassword = '';
+        setTimeout(() => {
+          this.showChangePassword = false;
+          this.passwordSuccess.set('');
+        }, 3000);
+      },
+      error: (err) => {
+        this.changingPassword.set(false);
+        this.passwordError.set(err.error?.error || 'Failed to change password.');
       }
     });
   }

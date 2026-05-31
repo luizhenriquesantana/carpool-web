@@ -2,15 +2,17 @@ import { Injectable, signal, computed, PLATFORM_ID, inject } from '@angular/core
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, from, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse, LoginRequest, RegisterRequest, SocialLoginRequest, UserProfile, ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest, PasswordResetResponse } from '../models/auth.model';
+import { CryptoService } from './crypto.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly cryptoService = inject(CryptoService);
   private readonly tokenSignal = signal<string | null>(null);
 
   readonly isAuthenticated = computed(() => !!this.tokenSignal());
@@ -58,13 +60,23 @@ export class AuthService {
   }
 
   register(request: RegisterRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/api/auth/register`, request).pipe(
+    // Hash password before sending
+    return from(this.cryptoService.hashPassword(request.password)).pipe(
+      switchMap(hashedPassword => {
+        const secureRequest = { ...request, password: hashedPassword };
+        return this.http.post<AuthResponse>(`${environment.apiUrl}/api/auth/register`, secureRequest);
+      }),
       tap(res => this.storeToken(res.token))
     );
   }
 
   login(request: LoginRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/api/auth/login`, request).pipe(
+    // Hash password before sending
+    return from(this.cryptoService.hashPassword(request.password)).pipe(
+      switchMap(hashedPassword => {
+        const secureRequest = { ...request, password: hashedPassword };
+        return this.http.post<AuthResponse>(`${environment.apiUrl}/api/auth/login`, secureRequest);
+      }),
       tap(res => this.storeToken(res.token))
     );
   }
@@ -136,7 +148,20 @@ export class AuthService {
   }
 
   changePassword(request: ChangePasswordRequest): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${environment.apiUrl}/api/auth/change-password`, request);
+    // Hash passwords before sending
+    return from(Promise.all([
+      this.cryptoService.hashPassword(request.currentPassword),
+      this.cryptoService.hashPassword(request.newPassword)
+    ])).pipe(
+      switchMap(([hashedCurrent, hashedNew]) => {
+        const secureRequest = {
+          ...request,
+          currentPassword: hashedCurrent,
+          newPassword: hashedNew
+        };
+        return this.http.post<{ message: string }>(`${environment.apiUrl}/api/auth/change-password`, secureRequest);
+      })
+    );
   }
 
   forgotPassword(request: ForgotPasswordRequest): Observable<PasswordResetResponse> {
@@ -144,6 +169,12 @@ export class AuthService {
   }
 
   resetPassword(request: ResetPasswordRequest): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${environment.apiUrl}/api/auth/reset-password`, request);
+    // Hash new password before sending
+    return from(this.cryptoService.hashPassword(request.newPassword)).pipe(
+      switchMap(hashedPassword => {
+        const secureRequest = { ...request, newPassword: hashedPassword };
+        return this.http.post<{ message: string }>(`${environment.apiUrl}/api/auth/reset-password`, secureRequest);
+      })
+    );
   }
 }

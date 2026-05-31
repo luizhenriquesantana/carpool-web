@@ -7,7 +7,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -17,7 +16,6 @@ import { AuthService } from '../../../core/services/auth.service';
     FormsModule, RouterLink,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-    MatSnackBarModule
   ],
   template: `
     <div class="auth-container">
@@ -39,24 +37,10 @@ import { AuthService } from '../../../core/services/auth.service';
             <div class="success-message">
               <mat-icon>check_circle</mat-icon>
               <p>{{ success() }}</p>
-              @if (isOAuthSetup()) {
-                <p class="oauth-notice">
-                  <mat-icon>info</mat-icon>
-                  You're setting up a local password for your OAuth account. You'll be able to log in with either method.
-                </p>
-              }
-              @if (resetToken()) {
-                <div class="token-display">
-                  <p><strong>Development Mode - Token:</strong></p>
-                  <code>{{ resetToken() }}</code>
-                  <p class="hint">
-                    <a mat-button color="primary" [routerLink]="['/reset-password']" 
-                       [queryParams]="{ email: resetEmail(), token: resetToken() }">
-                      Click here to use this token
-                    </a>
-                  </p>
-                </div>
-              }
+              <p class="hint">Please check your email inbox (and spam folder) for the reset link.</p>
+              <button mat-button color="primary" routerLink="/login">
+                Back to Login
+              </button>
             </div>
           } @else {
             <form (ngSubmit)="onSubmit()">
@@ -133,38 +117,10 @@ import { AuthService } from '../../../core/services/auth.service';
       height: 48px;
       margin-bottom: 8px;
     }
-    .token-display {
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 4px;
-      margin-top: 16px;
-      word-break: break-all;
-    }
-    .token-display code {
-      font-family: monospace;
-      font-size: 12px;
-      color: #333;
-    }
     .hint {
       font-size: 12px;
       color: #666;
-      margin-top: 8px;
-    }
-    .oauth-notice {
-      background: #e3f2fd;
-      color: #1565c0;
-      padding: 12px;
-      border-radius: 4px;
       margin: 12px 0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-    }
-    .oauth-notice mat-icon {
-      font-size: 20px;
-      width: 20px;
-      height: 20px;
     }
     mat-card-header {
       margin-bottom: 16px;
@@ -175,9 +131,10 @@ export class ForgotPasswordComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly snackBar = inject(MatSnackBar);
-
   email = '';
+  loading = signal(false);
+  error = signal('');
+  success = signal('');
 
   ngOnInit(): void {
     // Pre-fill email from query params if provided
@@ -185,12 +142,6 @@ export class ForgotPasswordComponent implements OnInit {
       if (params['email']) this.email = params['email'];
     });
   }
-  loading = signal(false);
-  error = signal('');
-  success = signal('');
-  resetToken = signal('');
-  resetEmail = signal('');
-  isOAuthSetup = signal(false);
 
   onSubmit(): void {
     if (!this.email) return;
@@ -201,18 +152,12 @@ export class ForgotPasswordComponent implements OnInit {
     this.authService.forgotPassword({ email: this.email }).subscribe({
       next: (res) => {
         this.loading.set(false);
-        this.success.set(res.message || 'Reset instructions sent to your email.');
-        this.resetEmail.set(this.email);
-        if (res.token) {
-          this.resetToken.set(res.token);
-        }
-        if (res.isOAuthSetup === 'true') {
-          this.isOAuthSetup.set(true);
-        }
+        this.success.set(res.message || 'A reset link has been sent to your email.');
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err.error?.error || 'Failed to process request. Please try again.');
+        // Still show success message even on error to not reveal if email exists
+        this.success.set('If an account with that email exists, a reset link has been sent.');
       }
     });
   }

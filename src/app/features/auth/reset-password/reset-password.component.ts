@@ -52,12 +52,7 @@ import { AuthService } from '../../../core/services/auth.service';
                 <mat-icon matSuffix>email</mat-icon>
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Reset Token</mat-label>
-                <input matInput [(ngModel)]="token" name="token" required
-                       placeholder="Enter the token from your email">
-                <mat-icon matSuffix>vpn_key</mat-icon>
-              </mat-form-field>
+              <!-- Token is auto-filled from email link -->
 
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>New Password</mat-label>
@@ -82,7 +77,7 @@ import { AuthService } from '../../../core/services/auth.service';
               }
 
               <button mat-raised-button color="primary" type="submit" class="full-width submit-btn"
-                      [disabled]="loading() || !email || !token || !newPassword || !confirmPassword || passwordsDoNotMatch()">
+                      [disabled]="loading() || !email || !newPassword || !confirmPassword || passwordsDoNotMatch()">
                 @if (loading()) {
                   <mat-spinner diameter="20"></mat-spinner>
                 } @else {

@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Disallow authenticated routes
+Disallow: /route-planner
+Disallow: /weekly-route
+Disallow: /postal-codes
+Disallow: /profile
+Disallow: /reset-password
+Disallow: /oauth-callback
+
+# Sitemap
+Sitemap: https://carpool-web-2026.web.app/sitemap.xml

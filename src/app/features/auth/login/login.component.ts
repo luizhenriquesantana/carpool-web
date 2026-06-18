@@ -100,6 +100,12 @@ import { environment } from '../../../../environments/environment';
           <a mat-button routerLink="/register">Don't have an account? Register</a>
         </mat-card-actions>
       </mat-card>
+      
+      <footer class="auth-footer">
+        <a href="https://santana.ie" target="_blank" rel="noopener noreferrer" class="footer-link">
+          Powered by Santana
+        </a>
+      </footer>
     </div>
   `,
   styles: [`
@@ -180,6 +186,20 @@ import { environment } from '../../../../environments/environment';
     }
     .divider span {
       padding: 0 12px;
+    }
+    .auth-footer {
+      margin-top: 24px;
+      text-align: center;
+    }
+    .footer-link {
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+    .footer-link:hover {
+      color: white;
+      text-decoration: underline;
     }
   `]
 })

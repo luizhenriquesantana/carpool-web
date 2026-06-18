@@ -111,10 +111,12 @@ import { environment } from '../../../../environments/environment';
   styles: [`
     .auth-container {
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 24px;
     }
     .auth-card {
       width: 400px;
@@ -188,8 +190,9 @@ import { environment } from '../../../../environments/environment';
       padding: 0 12px;
     }
     .auth-footer {
-      margin-top: 24px;
+      margin-top: auto;
       text-align: center;
+      padding-top: 24px;
     }
     .footer-link {
       color: rgba(255, 255, 255, 0.8);

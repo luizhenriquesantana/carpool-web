@@ -56,6 +56,12 @@ import { AuthService } from '../../core/services/auth.service';
           <router-outlet />
         </mat-sidenav-content>
       </mat-sidenav-container>
+      
+      <footer class="footer">
+        <a href="https://santana.ie" target="_blank" rel="noopener noreferrer" class="footer-link">
+          Powered by Santana
+        </a>
+      </footer>
     </div>
   `,
   styles: [`
@@ -84,6 +90,24 @@ import { AuthService } from '../../core/services/auth.service';
     }
     .content {
       padding: 24px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .footer {
+      padding: 16px;
+      text-align: center;
+      background-color: #f5f5f5;
+      border-top: 1px solid #e0e0e0;
+    }
+    .footer-link {
+      color: #666;
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+    .footer-link:hover {
+      color: #1976d2;
+      text-decoration: underline;
     }
     .active-link {
       background-color: rgba(0, 0, 0, 0.04);

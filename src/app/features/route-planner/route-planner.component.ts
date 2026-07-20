@@ -196,7 +196,10 @@ import { COUNTRIES } from '../../core/constants/countries';
           @if (loading()) {
             <mat-spinner diameter="20"></mat-spinner>
           } @else {
-            <mat-icon>route</mat-icon> Plan Route
+            <mat-icon>route</mat-icon>
+          }
+          @if (!loading()) {
+            <span>Plan Route</span>
           }
         </button>
       </div>

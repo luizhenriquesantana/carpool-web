@@ -100,7 +100,9 @@ interface ProfileResponse {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 <mat-icon>save</mat-icon>
-                Save Changes
+              }
+              @if (!saving()) {
+                <span>Save Changes</span>
               }
             </button>
 

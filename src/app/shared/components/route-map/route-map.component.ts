@@ -24,6 +24,9 @@ declare global {
       </mat-card-header>
       <mat-card-content>
         <div #mapContainer class="map-container"></div>
+        @if (errorMessage()) {
+          <p class="map-error">{{ errorMessage() }}</p>
+        }
       </mat-card-content>
     </mat-card>
   `,
@@ -34,6 +37,7 @@ declare global {
       height: 400px;
       border-radius: 4px;
     }
+    .map-error { color: #b3261e; margin: 12px 0 0; }
   `]
 })
 export class RouteMapComponent {
@@ -41,11 +45,11 @@ export class RouteMapComponent {
   private mapElement?: HTMLElement;
   private map?: any;
   private markers: any[] = [];
-  private directionsRenderer?: any;
-  private directionsService?: any;
+  private routePolylines: any[] = [];
 
   stops = input<ApiStop[]>([]);
   loading = signal(false);
+  errorMessage = signal('');
 
   constructor() {
     effect(() => {
@@ -63,17 +67,28 @@ export class RouteMapComponent {
     }
 
     this.loading.set(true);
+    this.errorMessage.set('');
 
-    if (!window.google?.maps) {
-      await this.loadGoogleMapsScript();
+    try {
+      if (!window.google?.maps) {
+        await this.loadGoogleMapsScript();
+      }
+      await this.renderMap(stops);
+    } catch (error) {
+      console.error('Unable to render route map:', error);
+      this.errorMessage.set('Unable to load the route map. Check the Google Maps API configuration.');
+    } finally {
+      this.loading.set(false);
     }
-
-    this.renderMap(stops);
-    this.loading.set(false);
   }
 
   private loadGoogleMapsScript(): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (!environment.googleMapsApiKey || environment.googleMapsApiKey.startsWith('YOUR_')) {
+        reject(new Error('A valid Google Maps API key has not been configured.'));
+        return;
+      }
+
       if (document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
         const check = setInterval(() => {
           if (window.google?.maps) {
@@ -98,13 +113,14 @@ export class RouteMapComponent {
     });
   }
 
-  private renderMap(stops: ApiStop[]): void {
+  private async renderMap(stops: ApiStop[]): Promise<void> {
     if (!window.google?.maps || !this.mapElement) return;
 
     // Clear previous markers and directions
     this.markers.forEach(m => m.setMap(null));
     this.markers = [];
-    this.directionsRenderer?.setMap(null);
+    this.routePolylines.forEach(polyline => polyline.setMap(null));
+    this.routePolylines = [];
 
     // Initialize map
     const center = { lat: stops[0].latitude, lng: stops[0].longitude };
@@ -130,51 +146,42 @@ export class RouteMapComponent {
       return;
     }
 
-    // Use DirectionsService for road-following routes
-    if (!this.directionsService) {
-      this.directionsService = new google.maps.DirectionsService();
-    }
-    if (!this.directionsRenderer) {
-      this.directionsRenderer = new google.maps.DirectionsRenderer({
-        map: this.map,
-        suppressMarkers: true,
+    const origin = { lat: stops[0].latitude, lng: stops[0].longitude };
+    const destination = { lat: stops[stops.length - 1].latitude, lng: stops[stops.length - 1].longitude };
+    const intermediates = stops.slice(1, -1).map(stop => ({
+      location: { lat: stop.latitude, lng: stop.longitude },
+      vehicleStopover: true
+    }));
+
+    try {
+      const { Route } = await google.maps.importLibrary('routes');
+      const { routes } = await Route.computeRoutes({
+        origin,
+        destination,
+        intermediates,
+        optimizeWaypointOrder: false,
+        travelMode: 'DRIVING',
+        fields: ['path']
+      });
+
+      if (!routes?.length) {
+        throw new Error('No routes found.');
+      }
+
+      this.routePolylines = routes[0].createPolylines({
         polylineOptions: {
           strokeColor: '#1976d2',
           strokeOpacity: 0.8,
           strokeWeight: 5
         }
       });
-    } else {
-      this.directionsRenderer.setMap(this.map);
+      this.routePolylines.forEach(polyline => polyline.setMap(this.map));
+    } catch (error) {
+      console.warn('Routes request failed; displaying a straight-line fallback.', error);
+      this.drawStraightLine(stops);
     }
 
-    const origin = { lat: stops[0].latitude, lng: stops[0].longitude };
-    const destination = { lat: stops[stops.length - 1].latitude, lng: stops[stops.length - 1].longitude };
-    const waypoints = stops.slice(1, -1).map(stop => ({
-      location: { lat: stop.latitude, lng: stop.longitude },
-      stopover: true
-    }));
-
-    this.directionsService.route(
-      {
-        origin,
-        destination,
-        waypoints,
-        optimizeWaypoints: false,
-        travelMode: google.maps.TravelMode.DRIVING
-      },
-      (result: any, status: any) => {
-        if (status === google.maps.DirectionsStatus.OK) {
-          this.directionsRenderer.setDirections(result);
-          this.addMarkers(stops);
-        } else {
-          console.warn('Directions request failed:', status);
-          // Fallback to straight lines
-          this.drawStraightLine(stops);
-          this.addMarkers(stops);
-        }
-      }
-    );
+    this.addMarkers(stops);
   }
 
   private addMarkers(stops: ApiStop[]): void {
@@ -233,5 +240,6 @@ export class RouteMapComponent {
       strokeWeight: 4
     });
     polyline.setMap(this.map);
+    this.routePolylines.push(polyline);
   }
 }

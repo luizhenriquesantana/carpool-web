@@ -167,7 +167,10 @@ interface DayForm {
           @if (loading()) {
             <mat-spinner diameter="20"></mat-spinner>
           } @else {
-            <mat-icon>calendar_month</mat-icon> Plan Weekly Route
+            <mat-icon>calendar_month</mat-icon>
+          }
+          @if (!loading()) {
+            <span>Plan Weekly Route</span>
           }
         </button>
       </div>

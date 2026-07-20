@@ -3,5 +3,5 @@ export const environment = {
   apiUrl: 'https://carpool-route-planning.fly.dev',
   googleClientId: 'YOUR_GOOGLE_CLIENT_ID',
   githubClientId: 'YOUR_GITHUB_CLIENT_ID',
-  googleMapsApiKey: 'YOUR_GOOGLE_CLIENT_ID'
+  googleMapsApiKey: 'YOUR_GOOGLE_MAPS_API_KEY'
 };

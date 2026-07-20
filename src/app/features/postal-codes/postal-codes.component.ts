@@ -58,7 +58,10 @@ import { COUNTRIES } from '../../core/constants/countries';
               @if (saving()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
-                <mat-icon>add</mat-icon> Save
+                <mat-icon>add</mat-icon>
+              }
+              @if (!saving()) {
+                <span>Save</span>
               }
             </button>
           </div>
